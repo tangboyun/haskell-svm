@@ -33,19 +33,22 @@ kernelFunc :: (RealFloat a,UV.Unbox a,NFData a) =>
 kernelFunc !dataSet !kernelPara =
   let !sps = samples dataSet
       !n = V.length sps
+      !l = UV.length $! V.unsafeIndex sps 0
+      splitEvery n [] = []
+      splitEvery n xs = take n xs : (splitEvery n $ drop n xs)
       !f = kernel kernelPara
       (ls1,ls2) = let !ss = [0..n-1] 
                   in (concat [[(x,y)|y<-ss,y>x]|x<-ss],[(x,x)|x<-ss])
       paraFunc = withStrategy 
-                 (parBuffer numCapabilities rdeepseq) . map 
+                 (parBuffer numCapabilities rdeepseq) . (map (map 
                  (\(i,j) -> 
                    let v_i = V.unsafeIndex sps i
                        v_j = V.unsafeIndex sps j
                        val = UV.sum $ 
                              UV.zipWith f v_i v_j
-                   in  (i,j,val))
-      vs1 = paraFunc ls1        
-      vs2 = paraFunc ls2
+                   in  (i,j,val))). splitEvery (ceiling $ 1000.0 / fromIntegral l))
+      vs1 = concat $ paraFunc ls1        
+      vs2 = concat $ paraFunc ls2
       vec = UV.replicate (n*n) 0
       vec' = runST $ do
         mv <- UV.unsafeThaw vec
@@ -59,4 +62,4 @@ kernelFunc !dataSet !kernelPara =
           MV.write mv' (j*n + i) val
         UV.unsafeFreeze mv'  
   in fromUnboxed (Z:.n:.n) vec''
-
+     

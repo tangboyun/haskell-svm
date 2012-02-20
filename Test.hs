@@ -61,7 +61,7 @@ data KKT = KKT Int Int Double Double
 instance (UV.Unbox a,RealFloat a,Random a) => Arbitrary (DataSet a) where
   arbitrary = do
     nSample   <- choose (20,100)
-    nVariable <- choose (10,200)
+    nVariable <- choose (10,500)
     nClass <- choose (2,20)
     ls <- vectorOf nSample $ elements [1..nClass] 
     ds <- vectorOf (nSample * nVariable) $ choose (-1.0,1.0)
