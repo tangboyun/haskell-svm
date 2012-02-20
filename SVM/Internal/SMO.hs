@@ -1,0 +1,167 @@
+{-# LANGUAGE BangPatterns #-}
+-----------------------------------------------------------------------------
+-- |
+-- Module : 
+-- Copyright : (c) 2012 Boyun Tang
+-- License : BSD-style
+-- Maintainer : tangboyun@hotmail.com
+-- Stability : experimental
+-- Portability : ghc
+--
+-- 
+--
+-----------------------------------------------------------------------------
+module SVM.Internal.SMO
+       (
+        smoC
+       )
+       where
+import           Control.Monad
+import           Control.Monad.ST.Strict
+import           Data.Array.Repa
+import           Data.List
+import qualified Data.Vector.Unboxed         as UV
+import qualified Data.Vector.Unboxed.Mutable as MV
+import           Numeric.IEEE
+
+data PID = PID {-# UNPACK #-} !Int
+               {-# UNPACK #-} !Double
+           
+data PII = PII {-# UNPACK #-} !Int           
+               {-# UNPACK #-} !Int
+           
+data PIDD = PIDD {-# UNPACK #-} !Int
+                 {-# UNPACK #-} !Double
+                 {-# UNPACK #-} !Double
+data PVDD = PVDD !(UV.Vector Double)            
+                 {-# UNPACK #-} !Double
+                 {-# UNPACK #-} !Double
+            
+-- | An SMO algorithm in Fan et al., JMLR 6(2005), p. 1889--1918
+-- Solves:
+-- >	min 0.5(\alpha^T Q \alpha) - e^T \alpha
+-- >		y^T \alpha = \delta
+-- >		y_i = +1 or -1
+-- >		0 <= alpha_i <= Cp for y_i = 1
+-- >		0 <= alpha_i <= Cn for y_i = -1
+-- >            e is the vector of all ones
+smoC :: Double ->               -- ^ Cp for y_i = 1
+       Double ->               -- ^ Cn for y_i = -1
+       UV.Vector Int ->        -- ^ y
+       Array U DIM2 Double ->  -- ^ Q[i][j] = y[i]*y[j]*K[i][j]; K: kernel matrix
+       UV.Vector Double       -- ^ alpha
+smoC !costP !costN !y !mQ = let l = UV.length y
+                                vAlpha = UV.replicate l 0.0
+                                vGradient = UV.replicate l (-1.0)
+                            in go vAlpha vGradient 0
+  where 
+    len = UV.length y
+    eps=1e-3            
+    tau=1e-12
+    maxIter = len * 2   -- need more test 
+    vec `atV` idx = UV.unsafeIndex vec idx
+    matrix `atM` sh =unsafeIndex matrix sh
+    vY =UV.map fromIntegral y
+    go !vA !vG !iter | iter < maxIter =
+      case selectedPair of
+        PII _ (-1) -> vA
+        PII i j    -> 
+          let !t_Yi = vY `atV` i
+              !t_Yj = vY `atV` j
+              !t_Gi = vG `atV` i
+              !t_Gj = vG `atV` j
+              !tmp  = mQ `atM` (Z:.i:.i) +
+                      mQ `atM` (Z:.j:.j) -
+                      2.0 * t_Yi * t_Yj * 
+                      mQ `atM` (Z:.i:.j)
+              !a    = if tmp <= 0
+                      then tau
+                      else tmp
+              !b    = -(t_Yi * t_Gi) + t_Yj * t_Gj                          
+              !(PVDD vA' oAi oAj) = runST $ do
+                vmA <- UV.unsafeThaw vA
+                oldAi <- MV.read vmA i
+                oldAj <- MV.read vmA j
+                let !sum_tmp = t_Yi * oldAi + t_Yj * oldAj
+                    !t_Ai = oldAi + t_Yi * b / a
+                    !cost_i = if y `atV` i == 1
+                              then costP
+                              else costN
+                MV.write vmA i t_Ai
+                when (t_Ai > cost_i) $
+                  MV.write vmA i cost_i
+                when (t_Ai < 0) $  
+                  MV.write vmA i 0.0
+                  
+                t_Ai' <- MV.read vmA i  
+                let !t_Aj = t_Yj * (sum_tmp - t_Yi * t_Ai')
+                    !cost_j = if y `atV` j == 1
+                              then costP
+                              else costN
+                MV.write  vmA j t_Aj
+                when (t_Aj > cost_j) $
+                  MV.write vmA j cost_j
+                when (t_Aj < 0) $
+                  MV.write vmA j 0
+                t_Aj' <- MV.read vmA j
+                MV.write vmA i $! t_Yi * (sum_tmp - t_Yj * t_Aj')
+                vA_new <- UV.unsafeFreeze vmA
+                return $! PVDD vA_new oldAi oldAj
+              !deltaAi = vA' `atV` i - oAi  
+              !deltaAj = vA' `atV` j - oAj
+              !iter' = iter + 1
+              !vG' = runST $ do
+                vmG <- UV.unsafeThaw vG
+                forM_ [0..len-1] $ \t -> do
+                  t_G <- MV.read vmG t
+                  MV.write vmG t $! t_G + mQ `atM` (Z:.t:.i) * deltaAi +
+                    mQ `atM` (Z:.t:.j) * deltaAj
+                UV.unsafeFreeze vmG
+          in go vA' vG' iter'
+             | otherwise = vA
+      where                                    
+        {-# INLINE selectedPair #-}
+        selectedPair = 
+          let !(PID i max_G) = foldl' (\p@(PID _ max_G') t->
+                                     let 
+                                       !t_G = vG `atV` t
+                                       !t_A = vA `atV` t
+                                       !t_y = y `atV` t
+                                       !g_Max = -(vY `atV` t) * t_G
+                                     in if ((t_y == 1 && t_A < costP) ||
+                                            (t_y == (-1) && t_A > 0)) &&
+                                           g_Max >= max_G'
+                                        then PID t g_Max
+                                        else p
+                                   ) (PID (-1) (-infinity)) [0..len-1]
+              !(PIDD j min_G _) = 
+                foldl' (\p@(PIDD j' min_G' obj_min) t ->
+                         let 
+                           !t_y = y `atV` t
+                           !t_A = vA `atV` t
+                           !t_G = vG `atV` t
+                           !t_vY= vY `atV` t
+                           !tmp = t_vY * t_G
+                         in if (t_y == 1 && t_A > 0) || 
+                                (t_y == (-1) && t_A < costN)
+                            then let !b = max_G + tmp
+                                     !g_min = if (-tmp) <= min_G'
+                                              then (-tmp)
+                                              else min_G'
+                                 in if b > 0
+                                    then let !g = mQ `atM` (Z:.i:.i) + 
+                                                  mQ `atM` (Z:.t:.t) -
+                                                  2.0 * (vY `atV` i) * 
+                                                  t_vY * mQ `atM` (Z:.i:.t) 
+                                             !a = if g <= 0 then tau else g
+                                             !obj_diff_min = - (b*b) / a
+                                         in if obj_diff_min <= obj_min
+                                            then PIDD t g_min obj_diff_min
+                                            else PIDD j' g_min obj_min
+                                    else PIDD j' g_min obj_min
+                            else p
+                       ) (PIDD (-1) infinity infinity) [0..len-1]
+          in if max_G - min_G < eps
+             then PII (-1) (-1)
+             else PII i j
+    
