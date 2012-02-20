@@ -37,7 +37,7 @@ data DataSet a = DataSet {
    ,samples :: !(RealFloat a => (V.Vector (UV.Vector a)))
    ,idxSlice :: !(M.IntMap (V.Vector Int)) -- ^ Indexes for each class
   }
-
+                          
 data SVMPara = SVMPara {
    kernelPara :: !KernelPara
   ,cost :: {-# UNPACK #-} !Double 
@@ -58,3 +58,6 @@ setCost svmPara c = svmPara {cost=c}
 
 setWeight :: SVMPara -> M.IntMap Double -> SVMPara
 setWeight svmPara w = svmPara {weight=w}
+
+instance Show (DataSet a) where
+  show dataSet = ""

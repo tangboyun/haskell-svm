@@ -11,7 +11,6 @@
 -- 
 --
 -----------------------------------------------------------------------------
-
 module Main where
 
 import Test.QuickCheck.All
@@ -24,37 +23,15 @@ import qualified Data.Vector as V
 import System.Random
 import qualified Data.IntMap as M
 import SVM.Types
+import qualified SVM.Kernel.CPU as C
+import Prelude hiding (zipWith)
+
 
 main = $quickCheckAll
 
-data KKT = KKT Int Int Double Double 
-           deriving (Show)
-  
-instance (UV.Unbox a,RealFloat a,Random a) => Arbitrary (DataSet a) where
-  arbitrary = do
-    nSample   <- choose (50,2000)
-    nVariable <- choose (10,2000)
-    nClass <- choose (2,20)
-    ls <- vectorOf nSample $ elements [1..nClass] 
-    ds <- vectorOf (nSample * nVariable) $ choose (-1.0,1.0)
-    let lv = UV.fromList ls
-        im = M.fromList $ zip [1..nClass] $ 
-               map (\k->V.findIndices (== k) (UV.convert lv)) [1..nClass]
-        dv = V.fromList $ map UV.fromList $ splitEvery nVariable ds
-    return $ DataSet Nothing lv dv im
-    where 
-      splitEvery n [] = []
-      splitEvery n xs = take n xs : (splitEvery n $ drop n xs)
-    
-instance Arbitrary KKT where
-  arbitrary = do
-    size <- choose (10,2000)
-    s <- arbitrary
-    cP <- choose (2.0^^(-8),2.0^^8)
-    cN <- choose (2.0^^(-8),2.0^^8)    
-    return $ KKT s size cP cN
-    
-eps=1e-6 
+-- | sum(y^Talpha) = 0 && 
+-- 0 <= alpha_i <= Cp for y_i = 1
+-- 0 <= alpha_i <= Cn for y_i = -1
 prop_smoC_KKT :: KKT -> Bool
 prop_smoC_KKT (KKT s size cP cN) =
   let gen = mkStdGen s
@@ -69,3 +46,39 @@ prop_smoC_KKT (KKT s size cP cN) =
       vS = UV.zipWith (\label alpha -> fromIntegral label * alpha)
            y vA
   in UV.and vC && (eps > UV.sum vS)
+
+prop_kernelMatrix_isSymmetric :: DataSet Float -> Bool
+prop_kernelMatrix_isSymmetric dataSet =
+  let mK = C.kernelFunc dataSet (RBF 1.0)
+      mK' = transpose mK
+  in foldAllP (&&) True $ zipWith (==) mK mK'
+     
+eps=1e-6 
+     
+data KKT = KKT Int Int Double Double 
+           deriving (Show)
+  
+instance (UV.Unbox a,RealFloat a,Random a) => Arbitrary (DataSet a) where
+  arbitrary = do
+    nSample   <- choose (20,100)
+    nVariable <- choose (10,200)
+    nClass <- choose (2,20)
+    ls <- vectorOf nSample $ elements [1..nClass] 
+    ds <- vectorOf (nSample * nVariable) $ choose (-1.0,1.0)
+    let lv = UV.fromList ls
+        im = M.fromList $ zip [1..nClass] $ 
+               map (\k->V.findIndices (== k) (UV.convert lv)) [1..nClass]
+        dv = V.fromList $ map UV.fromList $ splitEvery nVariable ds
+    return $ DataSet Nothing lv dv im
+    where 
+      splitEvery n [] = []
+      splitEvery n xs = take n xs : (splitEvery n $ drop n xs)
+    
+instance Arbitrary KKT where
+  arbitrary = do
+    size <- choose (10,200)
+    s <- arbitrary
+    cP <- choose (2.0^^(-8),2.0^^8)
+    cN <- choose (2.0^^(-8),2.0^^8)    
+    return $ KKT s size cP cN
+    
