@@ -20,7 +20,6 @@ import           Data.Array.Repa
 import qualified Data.Vector.Unboxed as UV
 import Control.Exception (assert)    
 
-type Matrix a = Array U DIM2 a
 
 {-# INLINE pack #-}
 pack :: (Shape sh, UV.Unbox a) => Array U (sh :. Int) a -> UV.Vector Bool -> Array U (sh :. Int) a

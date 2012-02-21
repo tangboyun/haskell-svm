@@ -20,6 +20,7 @@ import qualified Data.IntMap as M
 import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector as V
 import qualified Data.Text as T
+import Data.Array.Repa
 
 data KernelPara = Linear 
                 | Poly    {-# UNPACK #-} !Int
@@ -29,6 +30,8 @@ data KernelPara = Linear
                 | Sigmoid {-# UNPACK #-} !Double -- ^ gamma
                           {-# UNPACK #-} !Double -- ^ coef0
                   deriving (Eq)
+                           
+type Matrix a = Array U DIM2 a
                            
 data DataSet a = DataSet {
     labelText :: !(Maybe (M.IntMap T.Text)) -- ^ Text label
