@@ -23,27 +23,19 @@ import qualified Data.IntMap         as M
 import qualified Data.Vector         as V
 import qualified Data.Vector.Unboxed as UV
 import           SVM.Internal.SMO
+import           SVM.Internal.Matrix
 import           SVM.Types
 
-type Indexes = UV.Vector Int
-type Coefs a = UV.Vector a
-data SVCoef a = SVCoef !Indexes (Coefs a)
                   
-
-data CSVM a = CSVM {
-   para :: !SVMPara
-  ,dataset :: !(DataSet a)
-  ,matrixQ :: !(Array U DIM2 a)
-  ,slice :: !(Maybe (V.Vector Int))
-  ,packed :: !Bool
-  ,svCoef :: !(Maybe (M.IntMap (SVCoef a)))
-  }
+data ClassSlice = CS {-# UNPACK #-} !Int
+                     {-# UNPACK #-} !Int
+                  
 
 defaultCSVMPara = SVMPara (RBF 0) 1 M.empty
 
 buildCSVM :: (RealFloat a,UV.Unbox a,NFData a) => 
-             (DataSet a -> KernelPara -> Array U DIM2 a) -> 
-             DataSet a -> SVMPara -> CSVM a
+             (DataSet a -> KernelPara -> Matrix a) -> 
+             DataSet a -> SVMPara -> SVM a
 buildCSVM f dataSet svmPara = 
   case kernelPara svmPara of
     RBF 0 -> let nFeature = UV.length
@@ -59,4 +51,21 @@ buildCSVM f dataSet svmPara =
                  (\f sh@(Z:.i:.j) ->
                     y `at` i * y `at` j * 
                    (f sh))
-        in CSVM svmPara{kernelPara=p'} dataSet mQ Nothing False Nothing
+        in SVM svmPara{kernelPara=p'} dataSet mQ
+           
+trainCSVM :: Strategy -> SVM a -> Model a
+trainCSVM s svm = if (M.size . idxSlice . dataset $ svm) == 2
+                  then train2 svm
+                  else case s of
+                    OVO -> trainOVO svm
+                    OVA -> trainOVA svm
+                    
+train2 :: SVM a -> Model a
+train2 = undefined
+
+trainOVO :: SVM a -> Model a
+trainOVO = undefined
+
+trainOVA :: SVM a -> Model a
+trainOVA = undefined
+                      

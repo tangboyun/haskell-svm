@@ -41,12 +41,27 @@ data DataSet a = DataSet {
    ,idxSlice :: !(M.IntMap (V.Vector Int)) -- ^ Indexes for each class
   }
                           
+data SVM a = SVM {
+   para :: !SVMPara
+  ,dataset :: !(DataSet a)
+  ,matrixQ :: !(Matrix a)
+  }
+
+
+data Strategy = OVA  -- ^ one vs all 
+              | OVO  -- ^ one vs one
+
 data SVMPara = SVMPara {
    kernelPara :: !KernelPara
   ,cost :: {-# UNPACK #-} !Double 
   ,weight :: !(M.IntMap Double)
 --,probEst :: {-# UNPACK #-} !Bool  
   }
+
+type Indexes = UV.Vector Int
+type Coefs a = UV.Vector a
+data SVCoef a = SVCoef !Indexes !(Coefs a)
+data Model a = Model !(SVM a) !(M.IntMap (SVCoef a))
 
 setGamma :: SVMPara -> Double -> SVMPara
 setGamma svmPara gamma =
