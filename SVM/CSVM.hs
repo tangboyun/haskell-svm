@@ -119,10 +119,11 @@ trainOVO !svm@(SVM p dat mK_orign) =
                      (f sh))
               (Si r vA) = smoC cP cN y' mQ                   
               coefs = UV.zipWith (*) yd' vA
-              sv_idxs = UV.map (\e -> new_y `at` e) $ UV.findIndices (/= 0.0) vA
+              sv_idxs = UV.findIndices (/= 0.0) vA
+              sv_idxs_orig = UV.map (\e -> new_y `at` e) $ sv_idxs
               sv_coef = UV.unsafeBackpermute coefs sv_idxs
               num = encode nClass i j           
-          in (num,SVCoef r sv_idxs sv_coef)) ps
+          in (num,SVCoef r sv_idxs_orig sv_coef)) ps
       
 
 trainOVA :: SVM a -> Model a
