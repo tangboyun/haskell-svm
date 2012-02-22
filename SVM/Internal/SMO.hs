@@ -51,11 +51,12 @@ data RhoTmp = R {-# UNPACK #-} !Int
 -- >		0 <= alpha_i <= Cp for y_i = 1
 -- >		0 <= alpha_i <= Cn for y_i = -1
 -- >            e is the vector of all ones
-smoC :: (UV.Unbox a,RealFloat a) => Double ->               -- ^ Cp for y_i = 1
-       Double ->               -- ^ Cn for y_i = -1
-       UV.Vector Int ->        -- ^ y
-       Matrix a ->  -- ^ Q[i][j] = y[i]*y[j]*K[i][j]; K: kernel matrix
-       SolutionInfo           -- ^ rho and alpha
+smoC :: (UV.Unbox a,RealFloat a) => 
+        Double ->    -- ^ Cp for y_i = 1
+        Double ->    -- ^ Cn for y_i = -1
+        Label ->     -- ^ y
+        Matrix a ->  -- ^ Q[i][j] = y[i]*y[j]*K[i][j]; K: kernel matrix
+        SolutionInfo -- ^ rho and alpha
 smoC !costP !costN !y !mQ = let l = UV.length y
                                 vAlpha = UV.replicate l 0.0
                                 vGradient = UV.replicate l (-1.0)

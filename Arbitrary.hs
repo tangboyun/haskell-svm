@@ -47,4 +47,4 @@ instance Arbitrary KKT where
     cP <- choose (2.0^^(-8),2.0^^8)
     cN <- choose (2.0^^(-8),2.0^^8)    
     return $ KKT s size cP cN
-    
+     

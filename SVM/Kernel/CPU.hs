@@ -44,8 +44,7 @@ kernelFunc !dataSet !kernelPara =
                  (\(i,j) -> 
                    let v_i = V.unsafeIndex sps i
                        v_j = V.unsafeIndex sps j
-                       val = UV.sum $ 
-                             UV.zipWith f v_i v_j
+                       val = f v_i v_j
                    in  (i,j,val))). splitEvery (ceiling $ 1000.0 / fromIntegral l))
       vs1 = concat $ paraFunc ls1        
       vs2 = concat $ paraFunc ls2

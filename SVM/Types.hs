@@ -17,12 +17,12 @@ module SVM.Types
        
        
        where
-import qualified Data.IntMap as M
+import           Control.DeepSeq
+import           Data.Array.Repa
+import qualified Data.IntMap         as M
+import qualified Data.Text           as T
+import qualified Data.Vector         as V
 import qualified Data.Vector.Unboxed as UV
-import qualified Data.Vector as V
-import qualified Data.Text as T
-import Data.Array.Repa
-import Control.DeepSeq
 
 data KernelPara = Linear 
                 | Poly    {-# UNPACK #-} !Int
@@ -34,13 +34,17 @@ data KernelPara = Linear
                   deriving (Eq)
                            
 type Matrix a = Array U DIM2 a
-                           
+type Sample a = RealFloat a => V.Vector (UV.Vector a)  
+type Label = UV.Vector Int
+type Indexes = UV.Vector Int
+
 data DataSet a = DataSet {
     labelText :: !(Maybe (M.IntMap T.Text)) -- ^ Text label
-   ,labels :: !(UV.Vector Int)              -- ^ classification categories
-                                           -- ^ begin from 1 
-   ,samples :: !(RealFloat a => (V.Vector (UV.Vector a)))
-   ,idxSlice :: !(M.IntMap (V.Vector Int)) -- ^ Indexes for each class
+   ,labels :: !Label                        -- ^ classification categories y = y1,...,yn
+                                           -- ^ yi in [-1,1] for 2-class
+                                           -- ^ yi in [1..nClass] for multi-class 
+   ,samples :: !(Sample a)                  -- ^ x = n * l Matrix
+   ,idxSlice :: !(M.IntMap (V.Vector Int))  -- ^ Indexes for each class, key = y_i
   }
                           
 data SVM a = SVM {
@@ -58,11 +62,11 @@ data SVMPara = SVMPara {
    kernelPara :: !KernelPara
   ,cost :: {-# UNPACK #-} !Double 
   ,weight :: !(M.IntMap Double)
-  ,strategy :: {-# UNPACK #-} !Strategy
+  ,strategy :: !Strategy
 --,probEst :: {-# UNPACK #-} !Bool  
   }
 
-type Indexes = UV.Vector Int
+
 type Coefs = UV.Vector Double
 data SVCoef = SVCoef {-# UNPACK #-}!Double 
               !Indexes 
