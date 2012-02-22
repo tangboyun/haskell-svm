@@ -22,6 +22,7 @@ import qualified Data.Vector.Unboxed as UV
 import qualified Data.Vector as V
 import qualified Data.Text as T
 import Data.Array.Repa
+import Control.DeepSeq
 
 data KernelPara = Linear 
                 | Poly    {-# UNPACK #-} !Int
@@ -45,7 +46,7 @@ data DataSet a = DataSet {
 data SVM a = SVM {
    para :: !SVMPara
   ,dataset :: !(DataSet a)
-  ,matrixQ :: !(Matrix a)
+  ,matrixK :: !(Matrix a)
   }
 
 
@@ -88,3 +89,7 @@ setWeight !svmPara !w = svmPara {weight=w}
 
 instance Show (DataSet a) where
   show dataSet = ""
+instance NFData SVCoef where
+  rnf (SVCoef r idxs coefs) = r `seq` idxs `seq` coefs `seq` ()
+  
+  

@@ -22,9 +22,9 @@ import Control.Exception (assert)
 
 
 {-# INLINE pack #-}
-pack :: (Shape sh, UV.Unbox a) => Array U (sh :. Int) a -> UV.Vector Bool -> Array U (sh :. Int) a
+pack :: (Shape sh, UV.Unbox a) => Array U (sh :. Int) a -> UV.Vector Bool -> Array D (sh :. Int) a
 pack source idxVec  = assert (lastDimLen == i) $ 
-                      computeUnboxedP $ reshape (ss:. f idxVec) $ select f1 f2 ((size r) + 1)
+                      reshape (ss:. f idxVec) $ select f1 f2 ((size r) + 1)
   where
     r@(ss :. lastDimLen) = extent source
     i = UV.length idxVec
