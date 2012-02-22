@@ -106,7 +106,8 @@ trainOVO !svm@(SVM p dat mK_orign) =
                   else MV.write mv idx False
                 return mv       
               mK = computeUnboxedS $ 
-                   pack (computeUnboxedS $ transpose (pack mK_orign bitset)) bitset
+                   pack (computeUnboxedS $ 
+                         transpose (pack mK_orign bitset)) bitset
               new_y = UV.findIndices (\idx -> idx == i || idx == j) y     
               y' = UV.map (\e -> if e == i then 1 else -1) new_y
               yd' = UV.map fromIntegral y'
@@ -118,7 +119,7 @@ trainOVO !svm@(SVM p dat mK_orign) =
                      (f sh))
               (Si r vA) = smoC cP cN y' mQ                   
               coefs = UV.zipWith (*) yd' vA
-              sv_idxs = UV.findIndices (/= 0.0) vA
+              sv_idxs = UV.map (\e -> new_y `at` e) $ UV.findIndices (/= 0.0) vA
               sv_coef = UV.unsafeBackpermute coefs sv_idxs
               num = encode nClass i j           
           in (num,SVCoef r sv_idxs sv_coef)) ps
