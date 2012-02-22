@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE BangPatterns #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module : 
@@ -50,21 +51,29 @@ data SVM a = SVM {
 
 data Strategy = OVA  -- ^ one vs all 
               | OVO  -- ^ one vs one
+              | DAG
 
 data SVMPara = SVMPara {
    kernelPara :: !KernelPara
   ,cost :: {-# UNPACK #-} !Double 
   ,weight :: !(M.IntMap Double)
+  ,strategy :: {-# UNPACK #-} !Strategy
 --,probEst :: {-# UNPACK #-} !Bool  
   }
 
 type Indexes = UV.Vector Int
-type Coefs a = UV.Vector a
-data SVCoef a = SVCoef !Indexes !(Coefs a)
-data Model a = Model !(SVM a) !(M.IntMap (SVCoef a))
+type Coefs = UV.Vector Double
+data SVCoef = SVCoef {-# UNPACK #-}!Double 
+              !Indexes 
+              !Coefs
+                
+data SolutionInfo = Si {-# UNPACK #-} !Double
+                    !(UV.Vector Double)
+
+data Model a = Model !(SVM a) !(M.IntMap SVCoef)
 
 setGamma :: SVMPara -> Double -> SVMPara
-setGamma svmPara gamma =
+setGamma !svmPara !gamma =
   case kernelPara svmPara of 
     Poly i g c  -> svmPara {kernelPara=Poly i gamma c}
     RBF  g      -> svmPara {kernelPara=RBF gamma}
@@ -72,10 +81,10 @@ setGamma svmPara gamma =
     _           -> svmPara
     
 setCost :: SVMPara -> Double -> SVMPara
-setCost svmPara c = svmPara {cost=c}
+setCost !svmPara !c = svmPara {cost=c}
 
 setWeight :: SVMPara -> M.IntMap Double -> SVMPara
-setWeight svmPara w = svmPara {weight=w}
+setWeight !svmPara !w = svmPara {weight=w}
 
 instance Show (DataSet a) where
   show dataSet = ""
