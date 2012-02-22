@@ -27,10 +27,6 @@ import           SVM.Internal.Matrix
 import           SVM.Types
 
                   
-data ClassSlice = CS {-# UNPACK #-} !Int
-                     {-# UNPACK #-} !Int
-                  
-
 defaultCSVMPara = SVMPara (RBF 0) 1 M.empty
 
 buildCSVM :: (RealFloat a,UV.Unbox a,NFData a) => 
@@ -55,11 +51,11 @@ buildCSVM !f !dataSet !svmPara =
            
 train :: (RealFloat a,UV.Unbox a) => SVM a -> Model a
 train !svm = if (M.size . idxSlice . dataset $ svm) /= 2
-              then case strategy $ para svm of
-                OVO -> trainOVO svm
-                OVA -> trainOVA svm
-                DAG -> trainDAG svm
-              else trainOne svm
+             then case strategy $ para svm of
+               OVO -> trainOVO svm
+               OVA -> trainOVA svm
+               DAG -> trainDAG svm
+             else trainOne svm
                     
 {-# INLINE trainOne #-}
 trainOne :: (RealFloat a,UV.Unbox a) => SVM a -> Model a
@@ -80,7 +76,7 @@ trainOne !svm =
             
 
 trainOVO :: SVM a -> Model a
-trainOVO = undefined
+trainOVO !svm = 
 
 trainOVA :: SVM a -> Model a
 trainOVA = undefined
