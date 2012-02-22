@@ -13,7 +13,8 @@
 -----------------------------------------------------------------------------
 module SVM.Internal.SMO
        (
-        smoC
+        SolutionInfo(..)
+       ,smoC
        )
        where
 import           Control.Monad
@@ -37,6 +38,12 @@ data PVDD = PVDD !(UV.Vector Double)
                  {-# UNPACK #-} !Double
                  {-# UNPACK #-} !Double
             
+data RhoTmp = R {-# UNPACK #-} !Int
+              {-# UNPACK #-} !Double
+              {-# UNPACK #-} !Double
+              {-# UNPACK #-} !Double
+data SolutionInfo = Si {-# UNPACK #-} !Double
+                    !(UV.Vector Double)
 -- | An SMO algorithm in Fan et al., JMLR 6(2005), p. 1889--1918
 -- Solves:
 -- >	min 0.5(\alpha^T Q \alpha) - e^T \alpha
@@ -49,7 +56,7 @@ smoC :: Double ->               -- ^ Cp for y_i = 1
        Double ->               -- ^ Cn for y_i = -1
        UV.Vector Int ->        -- ^ y
        Array U DIM2 Double ->  -- ^ Q[i][j] = y[i]*y[j]*K[i][j]; K: kernel matrix
-       UV.Vector Double       -- ^ alpha
+       SolutionInfo           -- ^ rho and alpha
 smoC !costP !costN !y !mQ = let l = UV.length y
                                 vAlpha = UV.replicate l 0.0
                                 vGradient = UV.replicate l (-1.0)
@@ -64,7 +71,7 @@ smoC !costP !costN !y !mQ = let l = UV.length y
     vY =UV.map fromIntegral y
     go !vA !vG !iter | iter < maxIter =
       case selectedPair of
-        PII _ (-1) -> vA
+        PII _ (-1) -> Si rho vA
         PII i j    -> 
           let !t_Yi = vY `atV` i
               !t_Yj = vY `atV` j
@@ -118,8 +125,35 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                     mQ `atM` (Z:.t:.j) * deltaAj
                 UV.unsafeFreeze vmG
           in go vA' vG' iter'
-             | otherwise = vA
+             | otherwise = Si rho vA
       where                                    
+        !rho = let !(R nf sf up low) = 
+                     UV.ifoldl' (\(R nr_free sum_free ub lb) i g ->
+                                  let !yG = vY `UV.unsafeIndex` i * g 
+                                      !alpha = vA `UV.unsafeIndex` i
+                                      !yL = y `UV.unsafeIndex` i
+                                      !c = if y `UV.unsafeIndex` i == 1 
+                                           then costP
+                                           else costN                                  
+                                  in if alpha >= c
+                                     then if yL == (-1)
+                                          then let !ub' = min ub yG
+                                               in R nr_free sum_free ub' lb
+                                          else let !lb' = max lb yG
+                                               in R nr_free sum_free ub lb'
+                                     else if alpha <= 0
+                                          then if yL == 1
+                                               then let !ub' = min ub yG
+                                                    in R nr_free sum_free ub' lb
+                                               else let !lb' = max lb yG
+                                                    in R nr_free sum_free ub lb'
+                                          else let !nr_free' = nr_free + 1
+                                                   !sum_free' = sum_free + yG           
+                                               in R nr_free' sum_free' ub lb
+                                ) (R 0 0.0 infinity (-infinity)) vG
+               in if nf > 0
+                  then sf / fromIntegral nf
+                  else (up+low)/2
         {-# INLINE selectedPair #-}
         selectedPair = 
           let !(PID i max_G) = foldl' (\p@(PID _ max_G') t->
