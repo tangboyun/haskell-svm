@@ -36,7 +36,7 @@ defaultCSVMPara = SVMPara (RBF 0) 1 M.empty
 buildCSVM :: (RealFloat a,UV.Unbox a,NFData a) => 
              (DataSet a -> KernelPara -> Matrix a) -> 
              DataSet a -> SVMPara -> SVM a
-buildCSVM f dataSet svmPara = 
+buildCSVM !f !dataSet !svmPara = 
   case kernelPara svmPara of
     RBF 0 -> let nFeature = UV.length
                             (V.unsafeIndex (samples dataSet) 0)
@@ -53,15 +53,30 @@ buildCSVM f dataSet svmPara =
                    (f sh))
         in SVM svmPara{kernelPara=p'} dataSet mQ
            
-trainCSVM :: Strategy -> SVM a -> Model a
-trainCSVM s svm = if (M.size . idxSlice . dataset $ svm) == 2
-                  then train2 svm
-                  else case s of
-                    OVO -> trainOVO svm
-                    OVA -> trainOVA svm
+train :: (RealFloat a,UV.Unbox a) => SVM a -> Model a
+train !svm = if (M.size . idxSlice . dataset $ svm) /= 2
+              then case strategy $ para svm of
+                OVO -> trainOVO svm
+                OVA -> trainOVA svm
+                DAG -> trainDAG svm
+              else trainOne svm
                     
-train2 :: SVM a -> Model a
-train2 = undefined
+{-# INLINE trainOne #-}
+trainOne :: (RealFloat a,UV.Unbox a) => SVM a -> Model a
+trainOne !svm = 
+  let !mQ = matrixQ svm
+      !y = labels $! dataset svm
+      !yd = UV.map fromIntegral y
+      !p = para $! svm
+      !c = cost p
+      !m = weight $! p
+      !cP = c * (m M.! 1)
+      !cN = c * (m M.! (-1))
+      !(Si r vA) = smoC cP cN y mQ
+      !sv_idxs = UV.findIndices (/= 0.0) $ UV.zipWith (*) yd vA
+      !sv_coef = UV.unsafeBackpermute vA sv_idxs
+  in Model svm $! M.fromList [(0,SVCoef r sv_idxs sv_coef)]
+            
 
 trainOVO :: SVM a -> Model a
 trainOVO = undefined
@@ -69,3 +84,5 @@ trainOVO = undefined
 trainOVA :: SVM a -> Model a
 trainOVA = undefined
                       
+trainDAG :: SVM a -> Model a
+trainDAG = undefined
