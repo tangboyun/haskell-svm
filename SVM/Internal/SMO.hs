@@ -13,8 +13,7 @@
 -----------------------------------------------------------------------------
 module SVM.Internal.SMO
        (
-        SolutionInfo(..)
-       ,smoC
+         smoC
        )
        where
 import           Control.Monad
@@ -24,6 +23,7 @@ import           Data.List
 import qualified Data.Vector.Unboxed         as UV
 import qualified Data.Vector.Unboxed.Mutable as MV
 import           Numeric.IEEE
+import SVM.Types
 
 data PID = PID {-# UNPACK #-} !Int
                {-# UNPACK #-} !Double
@@ -42,8 +42,7 @@ data RhoTmp = R {-# UNPACK #-} !Int
               {-# UNPACK #-} !Double
               {-# UNPACK #-} !Double
               {-# UNPACK #-} !Double
-data SolutionInfo = Si {-# UNPACK #-} !Double
-                    !(UV.Vector Double)
+
 -- | An SMO algorithm in Fan et al., JMLR 6(2005), p. 1889--1918
 -- Solves:
 -- >	min 0.5(\alpha^T Q \alpha) - e^T \alpha
@@ -52,10 +51,10 @@ data SolutionInfo = Si {-# UNPACK #-} !Double
 -- >		0 <= alpha_i <= Cp for y_i = 1
 -- >		0 <= alpha_i <= Cn for y_i = -1
 -- >            e is the vector of all ones
-smoC :: Double ->               -- ^ Cp for y_i = 1
+smoC :: (UV.Unbox a,RealFloat a) => Double ->               -- ^ Cp for y_i = 1
        Double ->               -- ^ Cn for y_i = -1
        UV.Vector Int ->        -- ^ y
-       Array U DIM2 Double ->  -- ^ Q[i][j] = y[i]*y[j]*K[i][j]; K: kernel matrix
+       Matrix a ->  -- ^ Q[i][j] = y[i]*y[j]*K[i][j]; K: kernel matrix
        SolutionInfo           -- ^ rho and alpha
 smoC !costP !costN !y !mQ = let l = UV.length y
                                 vAlpha = UV.replicate l 0.0
@@ -64,11 +63,12 @@ smoC !costP !costN !y !mQ = let l = UV.length y
   where 
     len = UV.length y
     eps=1e-3            
-    tau=1e-12
+    tau=1e-12 :: Double
     maxIter = len * 2   -- need more test 
     vec `atV` idx = UV.unsafeIndex vec idx
     matrix `atM` sh =unsafeIndex matrix sh
     vY =UV.map fromIntegral y
+    go :: UV.Vector Double -> UV.Vector Double -> Int -> SolutionInfo
     go !vA !vG !iter | iter < maxIter =
       case selectedPair of
         PII _ (-1) -> Si rho vA
@@ -79,11 +79,11 @@ smoC !costP !costN !y !mQ = let l = UV.length y
               !t_Gj = vG `atV` j
               !tmp  = mQ `atM` (Z:.i:.i) +
                       mQ `atM` (Z:.j:.j) -
-                      2.0 * t_Yi * t_Yj * 
+                      2.0 * (realToFrac $ t_Yi * t_Yj) * 
                       mQ `atM` (Z:.i:.j)
               !a    = if tmp <= 0
                       then tau
-                      else tmp
+                      else realToFrac tmp
               !b    = -(t_Yi * t_Gi) + t_Yj * t_Gj                          
               !(PVDD vA' oAi oAj) = runST $ do
                 vmA <- UV.unsafeThaw vA
@@ -121,8 +121,8 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                 vmG <- UV.unsafeThaw vG
                 forM_ [0..len-1] $ \t -> do
                   t_G <- MV.read vmG t
-                  MV.write vmG t $! t_G + mQ `atM` (Z:.t:.i) * deltaAi +
-                    mQ `atM` (Z:.t:.j) * deltaAj
+                  MV.write vmG t $! t_G + (realToFrac (mQ `atM` (Z:.t:.i))) * deltaAi +
+                    (realToFrac (mQ `atM` (Z:.t:.j))) * deltaAj
                 UV.unsafeFreeze vmG
           in go vA' vG' iter'
              | otherwise = Si rho vA
@@ -183,10 +183,10 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                                               then (-tmp)
                                               else min_G'
                                  in if b > 0
-                                    then let !g = mQ `atM` (Z:.i:.i) + 
-                                                  mQ `atM` (Z:.t:.t) -
+                                    then let !g = realToFrac (mQ `atM` (Z:.i:.i) + 
+                                                  mQ `atM` (Z:.t:.t)) -
                                                   2.0 * (vY `atV` i) * 
-                                                  t_vY * mQ `atM` (Z:.i:.t) 
+                                                  t_vY * (realToFrac (mQ `atM` (Z:.i:.t)))
                                              !a = if g <= 0 then tau else g
                                              !obj_diff_min = - (b*b) / a
                                          in if obj_diff_min <= obj_min
