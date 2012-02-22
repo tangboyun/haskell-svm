@@ -22,7 +22,6 @@ import           Data.Array.Repa
 import           Data.List
 import qualified Data.Vector.Unboxed         as UV
 import qualified Data.Vector.Unboxed.Mutable as MV
-import           Numeric.IEEE
 import SVM.Types
 
 data PID = PID {-# UNPACK #-} !Int
@@ -51,9 +50,9 @@ data RhoTmp = R {-# UNPACK #-} !Int
 -- >		0 <= alpha_i <= Cp for y_i = 1
 -- >		0 <= alpha_i <= Cn for y_i = -1
 -- >            e is the vector of all ones
+{-# INLINE smoC #-}
 {-# SPECIALIZE smoC :: Double -> Double -> Label -> Matrix Double -> SolutionInfo #-}
 {-# SPECIALIZE smoC :: Double -> Double -> Label -> Matrix Float -> SolutionInfo #-}
-{-# INLINE smoC #-}
 smoC :: (UV.Unbox a,RealFloat a) => 
         Double ->    -- ^ Cp for y_i = 1
         Double ->    -- ^ Cn for y_i = -1
@@ -154,7 +153,7 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                                           else let !nr_free' = nr_free + 1
                                                    !sum_free' = sum_free + yG           
                                                in R nr_free' sum_free' ub lb
-                                ) (R 0 0.0 infinity (-infinity)) vG
+                                ) (R 0 0.0 (1.0/0) (-1.0/0)) vG
                in if nf > 0
                   then sf / fromIntegral nf
                   else (up+low)/2
@@ -171,7 +170,7 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                                            g_Max >= max_G'
                                         then PID t g_Max
                                         else p
-                                   ) (PID (-1) (-infinity)) [0..len-1]
+                                   ) (PID (-1) (-1.0/0)) [0..len-1]
               !(PIDD j min_G _) = 
                 foldl' (\p@(PIDD j' min_G' obj_min) t ->
                          let 
@@ -198,7 +197,7 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                                             else PIDD j' g_min obj_min
                                     else PIDD j' g_min obj_min
                             else p
-                       ) (PIDD (-1) infinity infinity) [0..len-1]
+                       ) (PIDD (-1) (1.0/0) (1.0/0)) [0..len-1]
           in if max_G - min_G < eps
              then PII (-1) (-1)
              else PII i j
