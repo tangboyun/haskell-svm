@@ -73,8 +73,9 @@ trainOne !svm =
       !cP = c * (m M.! 1)
       !cN = c * (m M.! (-1))
       !(Si r vA) = smoC cP cN y mQ
-      !sv_idxs = UV.findIndices (/= 0.0) $ UV.zipWith (*) yd vA
-      !sv_coef = UV.unsafeBackpermute vA sv_idxs
+      !coefs = UV.zipWith (*) yd vA
+      !sv_idxs = UV.findIndices (/= 0.0) vA
+      !sv_coef = UV.unsafeBackpermute coefs sv_idxs
   in Model svm $! M.fromList [(0,SVCoef r sv_idxs sv_coef)]
             
 
