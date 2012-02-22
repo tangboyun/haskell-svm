@@ -42,7 +42,7 @@ instance (UV.Unbox a,RealFloat a,Random a) => Arbitrary (DataSet a) where
     
 instance Arbitrary KKT where
   arbitrary = do
-    size <- choose (10,200)
+    size <- choose (200,400)
     s <- arbitrary
     cP <- choose (2.0^^(-8),2.0^^8)
     cN <- choose (2.0^^(-8),2.0^^8)    

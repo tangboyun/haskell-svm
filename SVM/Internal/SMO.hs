@@ -51,6 +51,9 @@ data RhoTmp = R {-# UNPACK #-} !Int
 -- >		0 <= alpha_i <= Cp for y_i = 1
 -- >		0 <= alpha_i <= Cn for y_i = -1
 -- >            e is the vector of all ones
+{-# SPECIALIZE smoC :: Double -> Double -> Label -> Matrix Double -> SolutionInfo #-}
+{-# SPECIALIZE smoC :: Double -> Double -> Label -> Matrix Float -> SolutionInfo #-}
+{-# INLINE smoC #-}
 smoC :: (UV.Unbox a,RealFloat a) => 
         Double ->    -- ^ Cp for y_i = 1
         Double ->    -- ^ Cn for y_i = -1
