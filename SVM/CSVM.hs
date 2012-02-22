@@ -23,7 +23,7 @@ import           Control.Exception
 import           Control.Monad
 import           Control.Monad.ST.Strict
 import           Control.Parallel.Strategies
-import           Data.Array.Repa hiding (map)
+import           Data.Array.Repa             hiding (map)
 import qualified Data.IntMap                 as M
 import           Data.List                   (sort,group,sortBy)
 import qualified Data.Vector                 as V
