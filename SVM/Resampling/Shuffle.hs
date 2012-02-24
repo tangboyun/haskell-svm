@@ -16,14 +16,16 @@
 module SVM.Resampling.Shuffle 
        
        where
+import qualified Data.Vector as V
+import qualified Data.Vector.Mutable as MV
 import qualified Data.Vector.Unboxed as UV
 import System.Random.MWC
 import Control.Monad.ST.Strict
 import Control.Monad
 import qualified Data.Vector.Unboxed.Mutable as MUV
 
-shuffle :: Seed -> Int -> (UV.Vector Int,Seed)
-shuffle !s !l = 
+shuffle_uv :: Seed -> Int -> (UV.Vector Int,Seed)
+shuffle_uv !s !l = 
   let 
       n = l - 1
   in  runST $ do
@@ -39,5 +41,21 @@ shuffle !s !l =
         per' <- UV.unsafeFreeze mv
         return $! (per',s')
       
+shuffle_v :: Seed -> Int -> (V.Vector Int,Seed)
+shuffle_v !s !l = 
+  let 
+      n = l - 1
+  in  runST $ do
+        mv <- V.unsafeThaw $ V.enumFromN 0 l
+        gen <- initialize $ fromSeed s
+        forM_ [0..n] $ \idx -> do
+          idx' <- uniformR (idx,n) gen
+          val_i <- MV.read mv idx
+          val_j <- MV.read mv idx'
+          MV.write mv idx val_j
+          MV.write mv idx' val_i
+        s' <- save gen  
+        per' <- V.unsafeFreeze mv
+        return $! (per',s')
 
 

@@ -35,11 +35,11 @@ eps=1e-6
 
 prop_shuffle :: Int -> Bool
 prop_shuffle len =
-  let len' = (len `mod` 2000) + 1
+  let len' = len `mod` 2000
       s = toSeed $ UV.singleton $ fromIntegral len
-      (vec,_) = shuffle s len'
+      (vec,_) = shuffle_uv s len'
       ls = [0..len'-1]
-  in and $ L.zipWith (==) ls $ L.sort $ map (vec `UV.unsafeIndex`) ls
+  in ls == (L.sort $ map (vec `UV.unsafeIndex`) ls)
                                             
 -- | sum(y^Talpha) = 0 && 
 -- 0 <= alpha_i <= Cp for y_i = 1
