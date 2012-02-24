@@ -24,12 +24,23 @@ import SVM.Types
 import qualified SVM.Kernel.CPU as C
 import Prelude hiding (zipWith)
 import Arbitrary
-
+import SVM.Resampling.Shuffle 
+import qualified Data.List as L
+import System.Random.MWC
 
 main = $quickCheckAll
 
 eps=1e-6 
 
+
+prop_shuffle :: Int -> Bool
+prop_shuffle len =
+  let len' = (len `mod` 2000) + 1
+      s = toSeed $ UV.singleton $ fromIntegral len
+      (vec,_) = shuffle s len'
+      ls = [0..len'-1]
+  in and $ L.zipWith (==) ls $ L.sort $ map (vec `UV.unsafeIndex`) ls
+                                            
 -- | sum(y^Talpha) = 0 && 
 -- 0 <= alpha_i <= Cp for y_i = 1
 -- 0 <= alpha_i <= Cn for y_i = -1
