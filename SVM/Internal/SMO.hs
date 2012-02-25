@@ -65,7 +65,7 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                             in go vAlpha vGradient 0
   where 
     !len = UV.length y
-    eps=1e-3            
+    eps=1e-3 :: Double
     tau=1e-12 :: Double
     !maxIter = len * 2   -- need more test 
     vec `atV` idx = UV.unsafeIndex vec idx
