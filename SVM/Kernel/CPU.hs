@@ -25,6 +25,7 @@ import qualified Data.Vector                 as V
 import qualified Data.Vector.Unboxed         as UV
 import qualified Data.Vector.Unboxed.Mutable as MV
 import           GHC.Conc                    (numCapabilities)
+import           SVM.Internal.Misc
 import           SVM.Kernel.Function
 import           SVM.Types
 
@@ -35,17 +36,15 @@ kernelFunc :: (RealFloat a,UV.Unbox a,NFData a) =>
 kernelFunc !dataSet !kernelPara =
   let !sps = samples dataSet
       !n = V.length sps
-      !l = UV.length $! V.unsafeIndex sps 0
-      splitEvery n [] = []
-      splitEvery n xs = take n xs : (splitEvery n $ drop n xs)
+      !l = UV.length $! sps `atV` 0
       !f = kernel kernelPara
       (ls1,ls2) = let !ss = [0..n-1] 
                   in (concat [[(x,y)|y<-ss,y>x]|x<-ss],[(x,x)|x<-ss])
       paraFunc = withStrategy 
                  (parBuffer numCapabilities rdeepseq) . (map (map 
                  (\(i,j) -> 
-                   let v_i = V.unsafeIndex sps i
-                       v_j = V.unsafeIndex sps j
+                   let v_i = sps `atV` i
+                       v_j = sps `atV` j
                        val = f v_i v_j
                    in (i,j,val))) . splitEvery 
                       (ceiling $! 2000.0 / fromIntegral l))
