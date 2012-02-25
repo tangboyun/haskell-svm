@@ -13,67 +13,24 @@
 -----------------------------------------------------------------------------
 module SVM.Resampling.CV 
        (
-         CVFold(..)
-       , cvSplit
+         cvSplit
        , cvSplit'
        )
        where
 
-import System.Random.MWC
-import qualified Data.Vector as V
-import qualified Data.IntMap as M
-import Data.List
-import SVM.Resampling.Shuffle
-import SVM.Types                 
-import Control.Monad.ST.Strict  
-import Control.Exception
-import Control.Parallel.Strategies
-import GHC.Conc
-import SVM.Internal.Matrix
-
-newtype CVFold = CVFold [(V.Vector Int,V.Vector Int)]
-
--- kFoldCV_impl :: SVMPara -> DataSet a -> Matrix a -> CVFold -> Int
--- kFoldCV_impl p dat mK (CVFold xs) =
---   let !y = labels $ dat
---       !yd = UV.map fromIntegral y
---       !c = cost p
---       !m = weight $! p
---       !nClass = M.size $! idxSlice dat
---       !mM = if nClass == 2
---             then computeUnboxedP $ unsafeTraverse mK id 
---                  (\f sh@(Z:.i:.j) ->
---                    (realToFrac $ yd `atUV` i * yd `atUV` j) * 
---                    (f sh))
---             else mK
---   in sum $ withStrategy 
---      (parBuffer numCapabilities rdeepseq) $ 
---      map (\(trainIdx,testIdx) ->
---            let mM' = packKernel mM trainIdx
---                y_train = UV.unsafeBackpermute y 
---                          (UV.convert trainIdx)
---                yd_train = UV.unsafeBackpermute yd trainIdx
---                tQ' = packKernel2 mQ trainIdx testIdx
---                sis = if nClass == 2
---                      then [trainOneLowLevel 
---                            (c*(m M.! 1)) 
---                            (c*(m M.! -1)) 
---                            y_train 
---                            yd_train mM']
---                      else 
---                        let 
---                          cs = [1..nClass]
---                           withStrategy 
---                             (parBuffer numCapabilities rdeepseq) $ 
---                             map (\(i,j) ->
---                                   let cP = c*(m M.! i)
---                                       cN = c*(m M.! j)
---                                       y' = UV.unsafeBackpermute 
-                                    
---                                     ) $
---                             concat [[(i,j)|j<-cs,j>i]|i<-cs]
---            in 
---            ) xs
+import           Control.Exception
+import           Control.Monad.ST.Strict
+import           Control.Parallel.Strategies
+import qualified Data.IntMap                 as M
+import           Data.List
+import qualified Data.Vector                 as V
+import           GHC.Conc
+import           SVM.CSVM.Impl
+import           SVM.Internal.Matrix
+import           SVM.Resampling.CV.Impl
+import           SVM.Resampling.Shuffle
+import           SVM.Types
+import           System.Random.MWC
 
 
 {-# INLINE cvSplit' #-}

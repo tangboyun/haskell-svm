@@ -27,7 +27,8 @@ import           SVM.CSVM
 import           SVM.Internal.Misc
 import           SVM.Internal.SMO
 import qualified SVM.Kernel.CPU                       as C
-import           SVM.Resampling.CrossValidation
+import           SVM.Resampling.CV
+import           SVM.Resampling.CV.Impl
 import           SVM.Resampling.Shuffle
 import           SVM.Types
 import           System.Random
@@ -54,7 +55,7 @@ prop_cvSplit :: (Int,DataSet Float) -> Bool
 prop_cvSplit (i,dat) =
   let nSample = UV.length $ labels dat
       fold = 1 + (i `mod` (nSample `div` 10))
-      xs   = cvSplit' fold dat
+      CVFold xs   = cvSplit' fold dat
   in and $ L.map (\(a,b) ->
                    [0..nSample-1] == (L.sort $ V.toList $ a V.++ b)) xs
             
@@ -83,9 +84,9 @@ prop_kernelFunc_kMatrixIsSymmetric dataSet =
       mK' = transpose mK
   in foldAllP (&&) True $ zipWith (==) mK mK'
       
--- | SVM1 == train (shuffle dataset) 
---   SVM2 == train dataset
--- SVM1 `predict` testset == SVM2 `predict` testset
+-- | model1 == train (shuffle dataset) 
+--   model2 == train dataset
+-- model1 `predict` testset == model2 `predict` testset
 prop_trainANDpredict_shuffleDatasetWontChangePredictResult :: DataSet Float -> Bool
 prop_trainANDpredict_shuffleDatasetWontChangePredictResult (DataSet lT ls ss is) =
   let nSample = UV.length ls

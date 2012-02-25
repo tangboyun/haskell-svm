@@ -38,6 +38,7 @@ type Sample a = RealFloat a => V.Vector (UV.Vector a)
 type Label = UV.Vector Int
 type Indexes = UV.Vector Int
 
+
 data DataSet a = DataSet {
     labelText :: !(Maybe (M.IntMap T.Text)) -- ^ Text label
    ,labels :: !Label                        -- ^ classification categories y = y1,...,yn
