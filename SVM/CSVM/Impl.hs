@@ -1,4 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE FlexibleContexts #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module : 
@@ -12,17 +14,21 @@
 --
 -----------------------------------------------------------------------------
 module SVM.CSVM.Impl 
-       
+       (
+         trainOneImpl
+       , trainOVOImpl
+       , predictImpl
+       , predictWithPreKernel
+       )
        where
 import           Control.Exception
---import           Control.Monad
---import           Control.Monad.ST.Strict
 import           Control.Parallel.Strategies
 import           Data.Array.Repa             hiding (map)
 import qualified Data.IntMap                 as M
 import           Data.List                   (sort,group,sortBy)
 import qualified Data.Vector                 as V
 import qualified Data.Vector.Unboxed         as UV
+import qualified Data.Vector.Generic as G
 import qualified Data.Vector.Unboxed.Mutable as MV
 import           GHC.Conc
 import           SVM.Internal.Matrix
@@ -66,7 +72,7 @@ trainOVOImpl !p !nClass !y !mK_orign = assert (nClass > 2) $
         (\(i,j) ->
           let n = UV.length y
               mK = packKernel mK_orign $! UV.filter (\e -> e == i || e == j) y
-              new_y = UV.findIndices (\idx -> idx == i || idx == j) y     
+              new_y = UV.findIndices (\e -> e == i || e == j) y     
               y' = UV.map (\e -> if e == i then 1 else -1) new_y
               yd' = UV.map fromIntegral y'
               cP = c * (m M.! i)
@@ -83,3 +89,66 @@ trainOVOImpl !p !nClass !y !mK_orign = assert (nClass > 2) $
               num = encode nClass i j           
           in (num,SVCoef r sv_idxs_orig sv_coef)) ps
 
+{-# INLINE predictImpl #-}
+{-# SPECIALIZE predictImpl :: KernelPara -> Int -> Sample Double -> Sample Double -> [(Int,SVCoef)] -> Label #-}
+{-# SPECIALIZE predictImpl :: KernelPara -> Int -> Sample Float -> Sample Float -> [(Int,SVCoef)] -> Label #-}
+predictImpl :: (RealFloat a,UV.Unbox a) => KernelPara -> Int -> Sample a -> Sample a -> [(Int,SVCoef)] -> Label
+predictImpl kP nClass trainset sample xs =
+    let f = kernel kP
+        n = V.length sample
+    in assert (UV.length (sample `atV` 0) ==
+               UV.length (trainset `atV` 0)) $
+     UV.fromList $! withStrategy 
+     (parBuffer numCapabilities rdeepseq) $ map 
+     (\idx_sample -> 
+       let x = sample `atV` idx_sample
+           final = head $ head $ 
+                sortBy (\a b -> compare (length b) (length a)) $ 
+                group $ sort $ withStrategy 
+                (parBuffer numCapabilities rdeepseq) $ map
+                (\(num,SVCoef r idxs sv_coef) ->
+                  let (i,j) = decode nClass num
+                      sum_dec = UV.ifoldl'            
+                                (\acc idx coef ->
+                                  let x1 = trainset `atV` 
+                                            (idxs `atUV` idx)
+                                      acc' = acc + coef * 
+                                             (realToFrac (f x x1))
+                                   in acc') 0.0 sv_coef
+                      dec_v = sum_dec - r
+                      vote = if dec_v > 0 
+                             then i 
+                             else j
+                  in vote) xs
+       in final) [0..n-1]
+     
+{-# INLINe predictWithPreKernel #-}
+{-# SPECIALIZE predictWithPreKernel :: Int -> V.Vector Int -> Matrix Double -> [(Int,SVCoef)] -> Label #-}
+{-# SPECIALIZE predictWithPreKernel :: Int -> V.Vector Int -> Matrix Float -> [(Int,SVCoef)] -> Label #-}
+{-# SPECIALIZE predictWithPreKernel :: Int -> UV.Vector Int -> Matrix Double -> [(Int,SVCoef)] -> Label #-}
+{-# SPECIALIZE predictWithPreKernel :: Int -> UV.Vector Int -> Matrix Float -> [(Int,SVCoef)] -> Label #-}
+predictWithPreKernel :: (RealFloat a,UV.Unbox a,G.Vector v Int) => Int -> v Int -> Matrix a -> [(Int,SVCoef)] -> Label
+predictWithPreKernel nClass testIdx mK xs =
+    let !tes_idx = G.length testIdx
+    in UV.fromList $! concat $ withStrategy 
+       (parBuffer numCapabilities rdeepseq) $ map (map
+       (\i -> 
+         let !test_idx = testIdx `atG` i
+             final = head $ head $ 
+                     sortBy (\a b -> compare (length b) (length a)) $ 
+                     group $ sort $ map
+                     (\(num,SVCoef r idxs sv_coef) ->
+                       let !(i,j) = decode nClass num
+                           !sum_dec = UV.ifoldl'            
+                                      (\acc idx coef ->
+                                        let train_idx = idxs `atUV` idx
+                                            acc' = acc + coef * 
+                                                   (realToFrac 
+                                                    (mK `atM` (Z:.train_idx:.test_idx)))
+                                        in acc') 0.0 sv_coef
+                           !dec_v = sum_dec - r
+                           !vote = if dec_v > 0 
+                                   then i 
+                                   else j
+                       in vote) xs
+         in final)) $ splitEvery 50 [0..tes_idx-1]
