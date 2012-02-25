@@ -33,7 +33,7 @@ cvSplit' = (fst .) . (cvSplit $ runST $ create >>= save)
 
 {-# INLINE cvSplit #-}
 cvSplit :: Seed -> Int -> DataSet a -> ([(V.Vector Int,V.Vector Int)],Seed)
-cvSplit !s !kFold !(DataSet _ _ c idxS) = assert (kFold > 0) $
+cvSplit !s !kFold !(DataSet _ _ _ idxS) = assert (kFold > 0) $
   let !ls = M.elems idxS
       !nClass = M.size idxS
       !(xs,s'') = foldl' (\(acc,seed) idxVec ->
