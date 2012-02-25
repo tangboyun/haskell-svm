@@ -36,3 +36,8 @@ atG = G.unsafeIndex
 {-# INLINE atM #-}
 atM :: (Repr r e,Shape sh) => Array r sh e -> sh -> e
 atM = unsafeIndex
+
+{-# INLINE splitEvery #-}
+splitEvery :: Int -> [a] -> [[a]]
+splitEvery n [] = []
+splitEvery n xs = take n xs : (splitEvery n $ drop n xs)
