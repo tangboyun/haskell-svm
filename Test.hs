@@ -40,6 +40,7 @@ main = $quickCheckAll
 eps=1e-6 
 defaultSeed = runST $ create >>= save
 
+-- | idx == sort $ shuffle idx 
 prop_shuffle :: Int -> Bool
 prop_shuffle len =
   let len' = len `mod` 2000
@@ -48,6 +49,7 @@ prop_shuffle len =
       ls = [0..len'-1]
   in ls == (L.sort $ map (vec `atUV`) ls)
                                             
+-- | trainset + testset == whole dataset     
 prop_cvSplit :: (Int,DataSet Float) -> Bool     
 prop_cvSplit (i,dat) =
   let nSample = UV.length $ labels dat
@@ -56,7 +58,7 @@ prop_cvSplit (i,dat) =
   in and $ L.map (\(a,b) ->
                    [0..nSample-1] == (L.sort $ V.toList $ a V.++ b)) xs
             
--- | sum(y^Talpha) = 0 && 
+-- | sum(y^T * alpha) = 0 && forall i:
 -- 0 <= alpha_i <= Cp for y_i = 1
 -- 0 <= alpha_i <= Cn for y_i = -1
 prop_smoC_KKT :: KKT -> Bool
@@ -74,12 +76,16 @@ prop_smoC_KKT (KKT s size cP cN) =
            y vA
   in UV.and vC && (eps > UV.sum vS)
 
+-- | K(i,j) == K(j,i)
 prop_kernelFunc_kMatrixIsSymmetric :: DataSet Float -> Bool
 prop_kernelFunc_kMatrixIsSymmetric dataSet =
   let mK = C.kernelFunc dataSet (RBF 1.0)
       mK' = transpose mK
   in foldAllP (&&) True $ zipWith (==) mK mK'
       
+-- | SVM1 == train (shuffle dataset) 
+--   SVM2 == train dataset
+-- SVM1 `predict` testset == SVM2 `predict` testset
 prop_trainANDpredict_shuffleDatasetWontChangePredictResult :: DataSet Float -> Bool
 prop_trainANDpredict_shuffleDatasetWontChangePredictResult (DataSet lT ls ss is) =
   let nSample = UV.length ls
