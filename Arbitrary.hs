@@ -29,11 +29,14 @@ instance (UV.Unbox a,RealFloat a,Random a) => Arbitrary (DataSet a) where
     nSample   <- choose (20,100)
     nVariable <- choose (10,500)
     nClass <- choose (2,20)
-    ls <- vectorOf nSample $ elements [1..nClass] 
+    let cs = if nClass == 2
+             then [1,-1]
+             else [1..nClass]
+    ls <- vectorOf nSample $ elements cs
     ds <- vectorOf (nSample * nVariable) $ choose (-1.0,1.0)
     let lv = UV.fromList ls
-        im = M.fromList $ zip [1..nClass] $ 
-               map (\k->V.findIndices (== k) (UV.convert lv)) [1..nClass]
+        im = M.fromList $ zip cs $ 
+               map (\k->V.findIndices (== k) (UV.convert lv)) cs
         dv = V.fromList $ map UV.fromList $ splitEvery nVariable ds
     return $ DataSet Nothing lv dv im
     where 
