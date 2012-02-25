@@ -41,7 +41,9 @@ import           System.Random.MWC
 kFoldCV :: (RealFloat a,UV.Unbox a) => SVM a -> (DataSet a -> (CVFold,Seed)) -> (Int,Seed)
 kFoldCV !(SVM p dat mK) !cvFold = 
   let !(fold,seed) = cvFold dat
-      !errIns = kFoldCV_impl p dat mK fold
+      !y = labels dat
+      !nClass = M.size $ idxSlice dat
+      !errIns = kFoldCV_impl nClass y fold mK p
   in (errIns,seed)
 
 {-# INLINE kFoldCV' #-}
@@ -49,7 +51,9 @@ kFoldCV !(SVM p dat mK) !cvFold =
 {-# SPECIALIZE kFoldCV' :: SVM Float -> (DataSet Float -> CVFold) -> Int #-}
 kFoldCV' :: (RealFloat a,UV.Unbox a) => SVM a -> (DataSet a -> CVFold) -> Int
 kFoldCV' !(SVM p dat mK) !cvFold = 
-  kFoldCV_impl p dat mK (cvFold dat)
+  let !y = labels dat
+      !nClass = M.size $ idxSlice dat
+  in kFoldCV_impl nClass y (cvFold dat) mK p
 
 {-# INLINE cvSplit' #-}
 cvSplit' :: Int -> DataSet a -> CVFold

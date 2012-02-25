@@ -32,15 +32,13 @@ import GHC.Conc
 newtype CVFold = CVFold [(V.Vector Int,V.Vector Int)]
 
 {-# INLINE kFoldCV_impl #-}
-{-# SPECIALIZE kFoldCV_impl :: SVMPara -> DataSet Float -> Matrix Float -> CVFold -> Int #-}
-{-# SPECIALIZE kFoldCV_impl :: SVMPara -> DataSet Double -> Matrix Double -> CVFold -> Int #-}
-kFoldCV_impl :: (RealFloat a,UV.Unbox a) => SVMPara -> DataSet a -> Matrix a -> CVFold -> Int
-kFoldCV_impl !p !dat !mK !(CVFold xs) =
-  let !y = labels $ dat
-      !yd = UV.map fromIntegral y
+{-# SPECIALIZE kFoldCV_impl :: Int -> Label -> CVFold -> Matrix Float -> SVMPara -> Int #-}
+{-# SPECIALIZE kFoldCV_impl :: Int -> Label -> CVFold -> Matrix Double -> SVMPara -> Int #-}
+kFoldCV_impl :: (RealFloat a,UV.Unbox a) => Int -> Label -> CVFold -> Matrix a -> SVMPara -> Int
+kFoldCV_impl !nClass !y  !(CVFold xs) !mK !p =
+  let !yd = UV.map fromIntegral y
       !c = cost p
       !m = weight $! p
-      !nClass = M.size $! idxSlice dat
       !mM = if nClass == 2
             then computeUnboxedP $ unsafeTraverse mK id 
                  (\f sh@(Z:.i:.j) ->
