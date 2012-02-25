@@ -28,7 +28,7 @@ instance (UV.Unbox a,RealFloat a,Random a) => Arbitrary (DataSet a) where
   arbitrary = do
     nSample   <- choose (20,100)
     nVariable <- choose (10,500)
-    nClass <- choose (2,20)
+    nClass <- choose (2,nSample `div` 10)
     let cs = if nClass == 2
              then [1,-1]
              else [1..nClass]
