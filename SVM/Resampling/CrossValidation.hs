@@ -25,7 +25,7 @@ import Data.List
 import SVM.Resampling.Shuffle
 import SVM.Types                 
 import Control.Monad.ST.Strict  
-
+import Control.Exception
 
 {-# INLINE cvSplit' #-}
 cvSplit' :: Int -> DataSet a -> [(V.Vector Int,V.Vector Int)]
@@ -33,16 +33,15 @@ cvSplit' = (fst .) . (cvSplit $ runST $ create >>= save)
 
 {-# INLINE cvSplit #-}
 cvSplit :: Seed -> Int -> DataSet a -> ([(V.Vector Int,V.Vector Int)],Seed)
-cvSplit !s !kFold !(DataSet _ _ _ idxSlice) = 
-  let !ls = M.elems idxSlice
-      !nClass = M.size idxSlice
+cvSplit !s !kFold !(DataSet _ _ c idxS) = assert (kFold > 0) $
+  let !ls = M.elems idxS
+      !nClass = M.size idxS
       !(xs,s'') = foldl' (\(acc,seed) idxVec ->
                           let !l = V.length idxVec
-                              !m = ceiling $! fromIntegral l / fromIntegral kFold
-                              !n = m * kFold
-                              !(i_vec,s') = shuffle_v seed n 
+                              !m = l `div` kFold
+                              !(i_vec,s') = shuffle seed idxVec
                               !idxs = V.fromList $! 
-                                      map (V.filter (< l)) $ splitEvery m i_vec
+                                      splitEvery m (kFold-1) i_vec
                           in (idxs:acc,s')) ([],s) ls
       !cvVec = V.fromList xs
       ss = map (\k -> 
@@ -57,8 +56,9 @@ cvSplit !s !kFold !(DataSet _ _ _ idxSlice) =
                ) [0..kFold-1]
   in (ss,s'')
   where 
-    splitEvery n vec = go vec []
+    splitEvery len count vec = go count vec []
       where 
-        go vec acc | V.null vec = acc
-                   | otherwise = let (av,bv) = V.splitAt n vec
-                                 in go bv (av:acc)
+        go !count !vec !acc | count > 0 = let (av,bv) = V.splitAt len vec
+                                          in go (count-1) bv (av:acc)
+                            | otherwise = vec : acc
+                                       

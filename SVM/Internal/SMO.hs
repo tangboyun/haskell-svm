@@ -64,13 +64,14 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                                 vGradient = UV.replicate l (-1.0)
                             in go vAlpha vGradient 0
   where 
-    len = UV.length y
+    !len = UV.length y
     eps=1e-3            
     tau=1e-12 :: Double
-    maxIter = len * 2   -- need more test 
+    !maxIter = len * 2   -- need more test 
     vec `atV` idx = UV.unsafeIndex vec idx
     matrix `atM` sh =unsafeIndex matrix sh
-    vY =UV.map fromIntegral y
+    !vY =UV.map fromIntegral y
+    {-# INLINE go #-}
     go :: UV.Vector Double -> UV.Vector Double -> Int -> SolutionInfo
     go !vA !vG !iter | iter < maxIter =
       case selectedPair of
