@@ -40,22 +40,3 @@ packKernel source idxVec = assert (n < j) $! fromListUnboxed (Z:.n:.n) $! ls
     ls = map (\(x,y) -> 
                source `atM` (Z:.x:.j)) $ concat [[(x,y)|y<-ns]|x<-ns]
     
-{-# INLINE packKernel2 #-}
-{-# SPECIALIZE packKernel2 :: G.Vector v Int => Array U DIM2 Double -> v Int -> v Int -> Array U DIM2 Double #-}
-{-# SPECIALIZE packKernel2 :: G.Vector v Int => Array U DIM2 Float -> v Int -> v Int -> Array U DIM2 Float #-}
-{-# SPECIALIZE packKernel2 :: Array U DIM2 Double -> V.Vector Int -> V.Vector Int -> Array U DIM2 Double #-}
-{-# SPECIALIZE packKernel2 :: Array U DIM2 Double -> UV.Vector Int -> UV.Vector Int -> Array U DIM2 Double #-}
-{-# SPECIALIZE packKernel2 :: Array U DIM2 Float -> V.Vector Int -> V.Vector Int -> Array U DIM2 Float #-}
-{-# SPECIALIZE packKernel2 :: Array U DIM2 Float -> UV.Vector Int -> UV.Vector Int -> Array U DIM2 Float #-}
-packKernel2 :: (UV.Unbox a,G.Vector v Int) => Array U DIM2 a -> v Int -> v Int -> Array U DIM2 a
-packKernel2 source train_idx test_idx = assert (j < max (G.length train_idx) (G.length test_idx)) $!
-                                        fromListUnboxed (Z:.train_len:.test_len) $! ls
-  where
-    (Z :. _ :. j) = extent source
-    train_len = G.length train_idx - 1
-    test_len = G.length test_idx - 1
-    trainIdxs = map (train_idx `atG`) [0..train_len]
-    testIdxs = map (test_idx `atG`) [0..test_len]
-    ls = map (\(train_i,test_j) ->
-               source `atM` (Z:.train_i:.test_j)) $
-         concat [[(a,b)|a<-trainIdxs]|b<-testIdxs]
