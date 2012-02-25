@@ -31,6 +31,7 @@ import qualified Data.Vector.Unboxed         as UV
 import qualified Data.Vector.Unboxed.Mutable as MV
 import           GHC.Conc
 import           SVM.Internal.Matrix
+import           SVM.Internal.Misc
 import           SVM.Internal.SMO
 import           SVM.Kernel.Function
 import           SVM.Types
@@ -40,17 +41,25 @@ defaultCSVMPara = SVMPara (RBF 0) 1 M.empty OVO
 buildCSVM :: (RealFloat a,UV.Unbox a,NFData a) => 
              (DataSet a -> KernelPara -> Matrix a) -> 
              DataSet a -> SVMPara -> SVM a
-buildCSVM !f !dataSet !svmPara = 
+buildCSVM !f !dataSet !sp = 
   case kernelPara svmPara of
-    RBF 0 -> let nFeature = UV.length
-                            (V.unsafeIndex (samples dataSet) 0)
+    RBF 0 -> let nFeature = UV.length $
+                            samples dataSet `atV` 0
              in go $ RBF $! 1.0 / fromIntegral nFeature
     p     -> go p
   where 
+    !k = M.size $ idxSlice dataSet 
+    !svmPara = if M.null $ weight sp
+               then if k == 2
+                    then sp {weight=M.fromList [(1,1),(-1,1)]}
+                    else sp {weight=M.fromList $ zip [1..k] $ repeat 1}
+               else sp
     go !p' =
       let mK = f dataSet p'
-      in SVM svmPara{kernelPara=p'} dataSet mK
+      in SVM svmPara {kernelPara=p'} dataSet mK
            
+{-# SPECIALIZE train :: SVM Double -> Model Double #-}
+{-# SPECIALIZE train :: SVM Float -> Model Float #-}
 train :: (RealFloat a,UV.Unbox a) => SVM a -> Model a
 train !svm = if (M.size . idxSlice . dataset $ svm) /= 2
              then case strategy $ para svm of
@@ -72,21 +81,13 @@ trainOne !svm@(SVM p dat mK) =
       !cN = c * (m M.! (-1))
       !mQ = computeUnboxedP $ unsafeTraverse mK id 
             (\f sh@(Z:.i:.j) ->
-              (realToFrac $ yd `at` i * yd `at` j) * 
+              (realToFrac $ yd `atUV` i * yd `atUV` j) * 
               (f sh))
       !(Si r vA) = smoC cP cN y mQ
       !coefs = UV.zipWith (*) yd vA
       !sv_idxs = UV.findIndices (/= 0.0) vA
       !sv_coef = UV.unsafeBackpermute coefs sv_idxs
   in Model svm $! M.fromList [(0,SVCoef r sv_idxs sv_coef)]
-     
-{-# INLINE at #-}     
-at :: UV.Unbox a => UV.Vector a -> Int -> a
-at = UV.unsafeIndex    
-            
-{-# INLINE atV #-}     
-atV :: V.Vector a -> Int -> a
-atV = V.unsafeIndex    
 
 {-# INLINE encode #-}
 encode :: Int -> Int -> Int -> Int 
@@ -103,7 +104,7 @@ decode !nClass !num = assert (nClass > 1) $!
 {-# SPECIALIZE trainOVO :: SVM Double -> Model Double #-}
 {-# SPECIALIZE trainOVO :: SVM Float -> Model Float #-}
 trainOVO :: (RealFloat a,UV.Unbox a) => SVM a -> Model a
-trainOVO !svm@(SVM p dat mK_orign) = 
+trainOVO !svm@(SVM p dat mK_orign) = assert (M.size (idxSlice dat) > 2) $
   let !idxs = idxSlice dat
       !y = labels dat
       !m = weight $ p
@@ -114,17 +115,7 @@ trainOVO !svm@(SVM p dat mK_orign) =
   in Model svm $! M.fromList $! parMap rdeepseq 
         (\(i,j) ->
           let n = UV.length y
-              bitset = UV.create $ do
-                mv <- MV.new n
-                forM_ [0..n-1] $ \idx ->
-                  if y `at` idx == i ||
-                     y `at` idx == j
-                  then MV.write mv idx True
-                  else MV.write mv idx False
-                return mv       
-              mK = computeUnboxedS $ 
-                   pack (computeUnboxedS $ 
-                         transpose (pack mK_orign bitset)) bitset
+              mK = packKernel mK_orign $! UV.filter (\e -> e == i || e == j) y
               new_y = UV.findIndices (\idx -> idx == i || idx == j) y     
               y' = UV.map (\e -> if e == i then 1 else -1) new_y
               yd' = UV.map fromIntegral y'
@@ -132,12 +123,12 @@ trainOVO !svm@(SVM p dat mK_orign) =
               cN = c * (m M.! j)
               mQ = computeUnboxedS $ unsafeTraverse mK id 
                    (\f sh@(Z:.i:.j) ->
-                     (realToFrac $ yd' `at` i * yd' `at` j) * 
+                     (realToFrac $ yd' `atUV` i * yd' `atUV` j) * 
                      (f sh))
               (Si r vA) = smoC cP cN y' mQ                   
               coefs = UV.zipWith (*) yd' vA
               sv_idxs = UV.findIndices (/= 0.0) vA
-              sv_idxs_orig = UV.map (\e -> new_y `at` e) $ sv_idxs
+              sv_idxs_orig = UV.map (\e -> new_y `atUV` e) $ sv_idxs
               sv_coef = UV.unsafeBackpermute coefs sv_idxs
               num = encode nClass i j           
           in (num,SVCoef r sv_idxs_orig sv_coef)) ps
@@ -174,7 +165,7 @@ predict !(Model (SVM (SVMPara kP _ _ _)
                       sum_dec = UV.ifoldl'            
                                 (\acc idx coef ->
                                   let x1 = dat `atV` 
-                                            (idxs `at` idx)
+                                            (idxs `atUV` idx)
                                       acc' = acc + coef * 
                                              (realToFrac (f x x1))
                                    in acc') 0.0 sv_coef
