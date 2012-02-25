@@ -22,7 +22,8 @@ import           Data.Array.Repa
 import           Data.List
 import qualified Data.Vector.Unboxed         as UV
 import qualified Data.Vector.Unboxed.Mutable as MV
-import SVM.Types
+import           SVM.Internal.Misc
+import           SVM.Types
 
 data PID = PID {-# UNPACK #-} !Int
                {-# UNPACK #-} !Double
@@ -68,8 +69,6 @@ smoC !costP !costN !y !mQ = let l = UV.length y
     eps=1e-3 :: Double
     tau=1e-12 :: Double
     !maxIter = len * 2   -- need more test 
-    vec `atV` idx = UV.unsafeIndex vec idx
-    matrix `atM` sh =unsafeIndex matrix sh
     !vY =UV.map fromIntegral y
     {-# INLINE go #-}
     go :: UV.Vector Double -> UV.Vector Double -> Int -> SolutionInfo
@@ -77,10 +76,10 @@ smoC !costP !costN !y !mQ = let l = UV.length y
       case selectedPair of
         PII _ (-1) -> Si rho vA
         PII i j    -> 
-          let !t_Yi = vY `atV` i
-              !t_Yj = vY `atV` j
-              !t_Gi = vG `atV` i
-              !t_Gj = vG `atV` j
+          let !t_Yi = vY `atUV` i
+              !t_Yj = vY `atUV` j
+              !t_Gi = vG `atUV` i
+              !t_Gj = vG `atUV` j
               !tmp  = mQ `atM` (Z:.i:.i) +
                       mQ `atM` (Z:.j:.j) -
                       2.0 * (realToFrac $ t_Yi * t_Yj) * 
@@ -95,7 +94,7 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                 oldAj <- MV.read vmA j
                 let !sum_tmp = t_Yi * oldAi + t_Yj * oldAj
                     !t_Ai = oldAi + t_Yi * b / a
-                    !cost_i = if y `atV` i == 1
+                    !cost_i = if y `atUV` i == 1
                               then costP
                               else costN
                 MV.write vmA i t_Ai
@@ -106,7 +105,7 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                   
                 t_Ai' <- MV.read vmA i  
                 let !t_Aj = t_Yj * (sum_tmp - t_Yi * t_Ai')
-                    !cost_j = if y `atV` j == 1
+                    !cost_j = if y `atUV` j == 1
                               then costP
                               else costN
                 MV.write  vmA j t_Aj
@@ -118,8 +117,8 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                 MV.write vmA i $! t_Yi * (sum_tmp - t_Yj * t_Aj')
                 vA_new <- UV.unsafeFreeze vmA
                 return $! PVDD vA_new oldAi oldAj
-              !deltaAi = vA' `atV` i - oAi  
-              !deltaAj = vA' `atV` j - oAj
+              !deltaAi = vA' `atUV` i - oAi  
+              !deltaAj = vA' `atUV` j - oAj
               !iter' = iter + 1
               !vG' = runST $ do
                 vmG <- UV.unsafeThaw vG
@@ -162,10 +161,10 @@ smoC !costP !costN !y !mQ = let l = UV.length y
         selectedPair = 
           let !(PID i max_G) = foldl' (\p@(PID _ max_G') t->
                                      let 
-                                       !t_G = vG `atV` t
-                                       !t_A = vA `atV` t
-                                       !t_y = y `atV` t
-                                       !g_Max = -(vY `atV` t) * t_G
+                                       !t_G = vG `atUV` t
+                                       !t_A = vA `atUV` t
+                                       !t_y = y `atUV` t
+                                       !g_Max = -(vY `atUV` t) * t_G
                                      in if ((t_y == 1 && t_A < costP) ||
                                             (t_y == (-1) && t_A > 0)) &&
                                            g_Max >= max_G'
@@ -175,10 +174,10 @@ smoC !costP !costN !y !mQ = let l = UV.length y
               !(PIDD j min_G _) = 
                 foldl' (\p@(PIDD j' min_G' obj_min) t ->
                          let 
-                           !t_y = y `atV` t
-                           !t_A = vA `atV` t
-                           !t_G = vG `atV` t
-                           !t_vY= vY `atV` t
+                           !t_y = y `atUV` t
+                           !t_A = vA `atUV` t
+                           !t_G = vG `atUV` t
+                           !t_vY= vY `atUV` t
                            !tmp = t_vY * t_G
                          in if (t_y == 1 && t_A > 0) || 
                                 (t_y == (-1) && t_A < costN)
@@ -189,7 +188,7 @@ smoC !costP !costN !y !mQ = let l = UV.length y
                                  in if b > 0
                                     then let !g = realToFrac (mQ `atM` (Z:.i:.i) + 
                                                   mQ `atM` (Z:.t:.t)) -
-                                                  2.0 * (vY `atV` i) * 
+                                                  2.0 * (vY `atUV` i) * 
                                                   t_vY * (realToFrac (mQ `atM` (Z:.i:.t)))
                                              !a = if g <= 0 then tau else g
                                              !obj_diff_min = - (b*b) / a
