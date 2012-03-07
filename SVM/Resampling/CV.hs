@@ -17,6 +17,7 @@ module SVM.Resampling.CV
        , cvSplit'
        , kFoldCV
        , kFoldCV'
+       , looCV
        )
        where
 
@@ -34,6 +35,15 @@ import           SVM.Resampling.CV.Impl
 import           SVM.Resampling.Shuffle
 import           SVM.Types
 import           System.Random.MWC
+
+{-# INLINE looCV #-}
+{-# SPECIALIZE looCV :: SVM Float -> Int #-}
+{-# SPECIALIZE looCV :: SVM Double -> Int #-}
+looCV :: (RealFloat a,UV.Unbox a) => SVM a -> Int
+looCV !(SVM p dat mK) =
+  let !y = labels dat
+      !nClass = M.size $ idxSlice dat
+  in looCV_impl nClass y mK p
 
 {-# INLINE kFoldCV #-}
 {-# SPECIALIZE kFoldCV :: SVM Double -> (DataSet Double -> (CVFold,Seed)) -> (Int,Seed) #-}

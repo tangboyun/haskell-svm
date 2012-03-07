@@ -15,6 +15,7 @@ module SVM.Resampling.CV.Impl
        (
          CVFold(..)
        , kFoldCV_impl
+       , looCV_impl
        )
        where
 
