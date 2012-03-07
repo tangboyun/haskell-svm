@@ -19,6 +19,7 @@ module SVM.CSVM.Impl
        , trainOVOImpl
        , predictImpl
        , predictWithPreKernel
+       , predictOneWithPreKernel
        )
        where
 import           Control.Exception
@@ -93,7 +94,7 @@ trainOVOImpl !p !nClass !y !mK_orign = assert (nClass > 2) $
 {-# SPECIALIZE predictImpl :: KernelPara -> Int -> Sample Double -> Sample Double -> [(Int,SVCoef)] -> Label #-}
 {-# SPECIALIZE predictImpl :: KernelPara -> Int -> Sample Float -> Sample Float -> [(Int,SVCoef)] -> Label #-}
 predictImpl :: (RealFloat a,UV.Unbox a) => KernelPara -> Int -> Sample a -> Sample a -> [(Int,SVCoef)] -> Label
-predictImpl kP nClass trainset sample xs =
+predictImpl !kP !nClass !trainset !sample !xs =
     let f = kernel kP
         n = V.length sample
     in assert (UV.length (sample `atV` 0) ==
@@ -152,3 +153,28 @@ predictWithPreKernel nClass testIdx mK xs =
                                    else j
                        in vote) xs
          in final)) $ splitEvery 50 [0..tes_idx-1]
+
+
+{-# INLINe predictOneWithPreKernel #-}
+{-# SPECIALIZE predictOneWithPreKernel :: Int -> Int -> Matrix Double -> [(Int,SVCoef)] -> Int #-}
+{-# SPECIALIZE predictOneWithPreKernel :: Int -> Int -> Matrix Float -> [(Int,SVCoef)] -> Int #-}
+predictOneWithPreKernel :: (RealFloat a,UV.Unbox a) => Int -> Int -> Matrix a -> [(Int,SVCoef)] -> Int
+predictOneWithPreKernel nClass test_idx mK xs =
+  let final = head $ head $ 
+              sortBy (\a b -> compare (length b) (length a)) $ 
+              group $ sort $ map
+              (\(num,SVCoef r idxs sv_coef) ->
+                let !(i,j) = decode nClass num
+                    !sum_dec = UV.ifoldl'            
+                               (\acc idx coef ->
+                                 let train_idx = idxs `atUV` idx
+                                     acc' = acc + coef * 
+                                            (realToFrac 
+                                             (mK `atM` (Z:.train_idx:.test_idx)))
+                                 in acc') 0.0 sv_coef
+                    !dec_v = sum_dec - r
+                    !vote = if dec_v > 0 
+                            then i 
+                            else j
+                in vote) xs
+  in final
