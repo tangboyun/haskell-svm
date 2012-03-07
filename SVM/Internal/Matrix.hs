@@ -17,12 +17,12 @@ module SVM.Internal.Matrix
        
        where
 
-import           Data.Array.Repa hiding (map)
+import           Control.Exception   (assert)
+import           Data.Array.Repa     hiding (map)
+import qualified Data.Vector         as V
 import qualified Data.Vector.Generic as G
-import qualified Data.Vector as V
 import qualified Data.Vector.Unboxed as UV
-import Control.Exception (assert)    
-import SVM.Internal.Misc
+import           SVM.Internal.Misc
 
 {-# INLINE packKernel #-}
 {-# SPECIALIZE packKernel :: G.Vector v Int => Array U DIM2 Double -> v Int -> Array U DIM2 Double #-}
