@@ -21,6 +21,7 @@ module SVM.Resampling.CV.Impl
 
 import           Control.Parallel.Strategies
 import           Data.Array.Repa             hiding (map)
+import           Data.Array.Repa.Operators.Traversal
 import qualified Data.IntMap                 as M
 import qualified Data.Vector                 as V
 import qualified Data.Vector.Unboxed         as UV
@@ -41,7 +42,7 @@ looCV_impl !nClass !y !mK !p =
       !c = cost p
       !m = weight $! p
       !mM = if nClass == 2
-            then computeUnboxedP $ unsafeTraverse mK id 
+            then computeUnboxedS $ unsafeTraverse mK id 
                  (\f sh@(Z:.i:.j) ->
                    (realToFrac $ yd `atUV` i * yd `atUV` j) * 
                    (f sh))
@@ -74,7 +75,7 @@ kFoldCV_impl !nClass !y  !(CVFold xs) !mK !p =
       !c = cost p
       !m = weight $! p
       !mM = if nClass == 2
-            then computeUnboxedP $ unsafeTraverse mK id 
+            then computeUnboxedS $ unsafeTraverse mK id 
                  (\f sh@(Z:.i:.j) ->
                    (realToFrac $ yd `atUV` i * yd `atUV` j) * 
                    (f sh))

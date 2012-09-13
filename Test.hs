@@ -82,7 +82,7 @@ prop_kernelFunc_kMatrixIsSymmetric :: DataSet Float -> Bool
 prop_kernelFunc_kMatrixIsSymmetric dataSet =
   let mK = C.kernelFunc dataSet (RBF 1.0)
       mK' = transpose mK
-  in foldAllP (&&) True $ zipWith (==) mK mK'
+  in foldAllS (&&) True $ zipWith (==) mK mK'
       
 -- | model1 == train (shuffle dataset) 
 --   model2 == train dataset

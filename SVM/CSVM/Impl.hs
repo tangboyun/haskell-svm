@@ -25,6 +25,7 @@ module SVM.CSVM.Impl
 import           Control.Exception
 import           Control.Parallel.Strategies
 import           Data.Array.Repa             hiding (map)
+import           Data.Array.Repa.Operators.Traversal
 import qualified Data.IntMap                 as M
 import           Data.List                   (sort,group,sortBy)
 import qualified Data.Vector                 as V

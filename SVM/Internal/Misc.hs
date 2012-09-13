@@ -34,7 +34,7 @@ atG :: G.Vector v a => v a -> Int -> a
 atG = G.unsafeIndex    
 
 {-# INLINE atM #-}
-atM :: (Repr r e,Shape sh) => Array r sh e -> sh -> e
+atM :: (Source r e,Shape sh) => Array r sh e -> sh -> e
 atM = unsafeIndex
 
 {-# INLINE splitEvery #-}

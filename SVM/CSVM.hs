@@ -22,6 +22,7 @@ module SVM.CSVM
 import           Control.Exception
 import           Control.Parallel.Strategies
 import           Data.Array.Repa             hiding (map)
+import           Data.Array.Repa.Operators.Traversal
 import qualified Data.IntMap                 as M
 import           Data.List                   (sort,group,sortBy)
 import qualified Data.Vector                 as V
@@ -78,7 +79,7 @@ trainOne !svm@(SVM p dat mK) =
       !m = weight $! p
       !cP = c * (m M.! 1)
       !cN = c * (m M.! (-1))
-      !mQ = computeUnboxedP $ unsafeTraverse mK id 
+      !mQ = computeUnboxedS $ unsafeTraverse mK id 
             (\f sh@(Z:.i:.j) ->
               (realToFrac $ yd `atUV` i * yd `atUV` j) * 
               (f sh))
